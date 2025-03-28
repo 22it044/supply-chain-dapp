@@ -1,3 +1,5 @@
+import { isUserLoggedIn, getCurrentUser } from './auth';
+
 var abi = [
 	{
 		"inputs": [
@@ -438,6 +440,33 @@ console.log("blockchain connected")
 $(document).ready(function () {
 	$("#_updatebtn").hide();
 
+	// Check if user is authenticated as a producer
+	if (!isUserLoggedIn()) {
+		// Hide producer-specific sections
+		$('#producer-registration-section').hide();
+		$('#add-product-section').hide();
+		$('#my-products-section').hide();
+		$('#orders-section').hide();
+		
+		// Show authentication required message
+		$('<div class="alert alert-warning mt-4">Please login to access the producer dashboard.</div>').insertAfter('.lead');
+		return;
+	}
+	
+	// Check if user is a producer
+	const currentUser = getCurrentUser();
+	if (currentUser.userType !== 'producer') {
+		// Hide producer-specific sections
+		$('#producer-registration-section').hide();
+		$('#add-product-section').hide();
+		$('#my-products-section').hide();
+		$('#orders-section').hide();
+		
+		// Show unauthorized message
+		$('<div class="alert alert-danger mt-4">You need to be registered as a producer to access this dashboard.</div>').insertAfter('.lead');
+		return;
+	}
+
 	// Setup connect button click
 	$('#connect-button').click(async function() {
 		await connectMetaMask();
@@ -520,7 +549,7 @@ $(document).ready(function () {
 					// index = productDetails + 1;
 					console.log(productDetails);
 					if (productDetails[4]) {
-						var row = "<tr><th>" + productDetails[0] + "</th><td>" + productDetails[3] + "</td><td>" + productDetails[1] + "</td><td>" + productDetails[2] + "</td><td><button type=\"button\" class=\"btn btn-secondary btn-sm\" onclick=\"priceUpdate(" + productDetails[0] + ")\">Change price</button></td></tr>";
+						var row = "<tr><th>" + productDetails[0] + "</th><td>" + productDetails[3] + "</td><td>" + productDetails[1] + "</td><td>" + productDetails[2] + "</td><td><button type=\"button\" class=\"btn btn-secondary btn-sm\" onclick=\"updateProductPrice(" + productDetails[0] + ")\">Change price</button></td></tr>";
 						$("#_myproduct_table").find('tbody').append(row);
 					}
 				});
@@ -651,16 +680,38 @@ function delivered(orderId) {
 	});
 }
 
-function priceUpdate(productId) {
-	console.log("order click : " + productId);
-	// alert(productId);
-
-	$("#_nameidlabel").html("Product ID");
-	$("#_pricelabel").html("New price");
-	$("#_quantitylabel").hide();
-	$("#_addbtn").hide();
-	$("#_updatebtn").show();
-	$("#_pname").val(productId);
+function updateProductPrice(productId) {
+	var newPrice = prompt("Enter new price for product " + productId);
+	if(newPrice === null || newPrice === "") {
+		return;
+	}
+	
+	// Price must be a positive number
+	newPrice = parseFloat(newPrice);
+	if(isNaN(newPrice) || newPrice <= 0) {
+		alert("Please enter a valid price");
+		return;
+	}
+	
+	document.getElementById("product-loading").style.display = "block";
+	
+	// Convert price to wei (assuming ETH input)
+	const priceInWei = web3.utils.toWei(newPrice.toString(), 'ether');
+	
+	web3.eth.getAccounts().then(function (accounts) {
+		var account = accounts[0];
+		contract.methods.newPrice(productId, priceInWei).send({from: account})
+		.then(function(receipt) {
+			document.getElementById("product-loading").style.display = "none";
+			alert("Price updated successfully!");
+			loadProducerProducts();
+		})
+		.catch(function(error) {
+			document.getElementById("product-loading").style.display = "none";
+			console.error("Error updating price:", error);
+			alert("Failed to update price: " + error.message);
+		});
+	});
 }
 
 function gotoBuyer() {
@@ -756,77 +807,6 @@ function addProduct() {
 		.catch(function(error) {
 			console.error("Error adding product:", error);
 			alert("Failed to add product. Make sure you are registered as a producer.");
-		});
-	});
-}
-
-// Update price function
-function priceUpdate(productId) {
-	var newPrice = prompt("Enter new price for product " + productId);
-	if(newPrice === null || newPrice === "") {
-		return;
-	}
-	
-	if(!web3) {
-		alert("Please connect to MetaMask first!");
-		return;
-	}
-	
-	ethereum.request({ method: 'eth_accounts' })
-	.then(function(accounts) {
-		contract.methods.newPrice(productId, newPrice).send({from: accounts[0]})
-		.then(function(receipt) {
-			console.log(receipt);
-			alert("Price updated successfully!");
-			loadProducerProducts();
-		})
-		.catch(function(error) {
-			console.error("Error updating price:", error);
-			alert("Failed to update price. Make sure you own this product.");
-		});
-	});
-}
-
-// Delivered function
-function delivered(orderId) {
-	if(!web3) {
-		alert("Please connect to MetaMask first!");
-		return;
-	}
-	
-	ethereum.request({ method: 'eth_accounts' })
-	.then(function(accounts) {
-		contract.methods.giveOrderItsStatus(orderId, "Delivered").send({from: accounts[0]})
-		.then(function(receipt) {
-			console.log(receipt);
-			alert("Order marked as delivered!");
-			loadProducerOrders();
-		})
-		.catch(function(error) {
-			console.error("Error updating order status:", error);
-			alert("Failed to update order status.");
-		});
-	});
-}
-
-// Reject function
-function reject(orderId) {
-	if(!web3) {
-		alert("Please connect to MetaMask first!");
-		return;
-	}
-	
-	ethereum.request({ method: 'eth_accounts' })
-	.then(function(accounts) {
-		contract.methods.giveOrderItsStatus(orderId, "Rejected").send({from: accounts[0]})
-		.then(function(receipt) {
-			console.log(receipt);
-			alert("Order rejected!");
-			loadProducerOrders();
-		})
-		.catch(function(error) {
-			console.error("Error updating order status:", error);
-			alert("Failed to update order status.");
 		});
 	});
 }

@@ -1,3 +1,5 @@
+import { isUserLoggedIn, getCurrentUser } from './auth';
+
 var abi = [
 	{
 		"inputs": [
@@ -436,6 +438,31 @@ var contract = new web3.eth.Contract(abi, address);
 console.log("blockchain connected")
 
 $(document).ready(function () {
+    // Check if user is authenticated as a consumer
+    if (!isUserLoggedIn()) {
+        // Hide consumer-specific sections
+        $('#consumer-registration-section').hide();
+        $('#available-products-section').hide();
+        $('#my-orders-section').hide();
+        
+        // Show authentication required message
+        $('<div class="alert alert-warning mt-4">Please login to access the consumer dashboard.</div>').insertAfter('.lead');
+        return;
+    }
+    
+    // Check if user is a consumer
+    const currentUser = getCurrentUser();
+    if (currentUser.userType !== 'consumer') {
+        // Hide consumer-specific sections
+        $('#consumer-registration-section').hide();
+        $('#available-products-section').hide();
+        $('#my-orders-section').hide();
+        
+        // Show unauthorized message
+        $('<div class="alert alert-danger mt-4">You need to be registered as a consumer to access this dashboard.</div>').insertAfter('.lead');
+        return;
+    }
+
     // Setup connect button click
     $('#connect-button').click(async function() {
         await connectMetaMask();
