@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supply Chain DApp</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center mt-5">
+            <div class="col-lg-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="mb-0">Supply Chain Blockchain Tracker</h3>
+                    </div>
+                    <div class="card-body">
+                        <!-- MetaMask Connection Section -->
+                        <div class="mb-4 p-4 bg-light rounded text-center">
+                            <h4 class="mb-3">Connect Your Wallet to Track Products</h4>
+                            <div id="metamask-warning" style="display: none;"></div>
+                            
+                            <div id="wallet-not-connected">
+                                <p class="mb-4">To access the supply chain tracking system, please connect your MetaMask wallet.</p>
+                                <button id="connect-metamask" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-wallet2"></i> Connect MetaMask
+                                </button>
+                            </div>
+                            
+                            <div id="wallet-connected" style="display: none;">
+                                <div class="alert alert-success">
+                                    <i class="bi bi-check-circle-fill"></i> Wallet Connected
+                                </div>
+                                <div id="metamask-status" class="mb-4"></div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-body text-center">
+                                                <i class="bi bi-box-seam fs-1 text-primary mb-3"></i>
+                                                <h5>Track Products</h5>
+                                                <p class="text-muted">View the complete history and current status of products</p>
+                                                <a href="track-product.html" class="btn btn-outline-primary mt-2">Track Now</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-body text-center">
+                                                <i class="bi bi-person-badge fs-1 text-primary mb-3"></i>
+                                                <h5>User Dashboard</h5>
+                                                <p class="text-muted">Access your personalized dashboard</p>
+                                                <div id="dashboard-buttons">
+                                                    <a href="producer.html" id="producer-button" class="btn btn-outline-primary mt-2 me-2" style="display: none;">Producer Dashboard</a>
+                                                    <a href="consumer.html" id="consumer-button" class="btn btn-outline-primary mt-2" style="display: none;">Consumer Dashboard</a>
+                                                    <button id="register-role-button" class="btn btn-outline-primary mt-2">Register Role</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Role Registration (Initially Hidden) -->
+                        <div id="role-registration" class="p-4 border rounded" style="display: none;">
+                            <h4 class="mb-3">Register Your Role</h4>
+                            <p>Choose your role in the supply chain:</p>
+                            
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="radio" name="user-type" id="producer-type" value="producer" required>
+                                <label class="form-check-label" for="producer-type">
+                                    <strong>Producer</strong> - I manufacture or produce products
+                                </label>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="radio" name="user-type" id="consumer-type" value="consumer" required>
+                                <label class="form-check-label" for="consumer-type">
+                                    <strong>Consumer</strong> - I purchase or consume products
+                                </label>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <button id="register-role-submit" class="btn btn-primary">Register Role</button>
+                                <button id="cancel-registration" class="btn btn-outline-secondary ms-2">Cancel</button>
+                            </div>
+                        </div>
+                        
+                        <!-- About Section -->
+                        <div class="mt-4">
+                            <h4 class="mb-3">About Supply Chain Tracker</h4>
+                            <p>This decentralized application (DApp) allows stakeholders to track products through the entire supply chain, from production to final delivery.</p>
+                            <div class="row mt-4">
+                                <div class="col-md-4 text-center mb-3">
+                                    <i class="bi bi-shield-check fs-1 text-success"></i>
+                                    <h5>Transparent</h5>
+                                    <p class="small">All transactions are stored on blockchain, ensuring complete transparency.</p>
+                                </div>
+                                <div class="col-md-4 text-center mb-3">
+                                    <i class="bi bi-link-45deg fs-1 text-success"></i>
+                                    <h5>Immutable</h5>
+                                    <p class="small">Records cannot be altered once added, guaranteeing data integrity.</p>
+                                </div>
+                                <div class="col-md-4 text-center mb-3">
+                                    <i class="bi bi-clock-history fs-1 text-success"></i>
+                                    <h5>Real-time</h5>
+                                    <p class="small">Track products in real-time as they move through the supply chain.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+    <script src="contractABI.js"></script>
+    <script src="metamask.js"></script>
+    <script src="auth.js"></script>
+    <script src="index.js"></script>
+</body>
+</html> 

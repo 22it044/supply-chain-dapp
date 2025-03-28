@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const googleLoginBtn = document.getElementById('google-login');
     const microsoftLoginBtn = document.getElementById('microsoft-login');
     const acceptTermsBtn = document.getElementById('accept-terms-btn');
+    const metamaskSection = document.getElementById('metamask-section');
+    const connectMetamaskBtn = document.getElementById('connect-metamask');
     
     // Get DOM elements for authentication on dashboard pages
     const userStatus = document.getElementById('user-status');
@@ -47,6 +49,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // MetaMask warning elements
     const metamaskWarning = document.getElementById('metamask-warning');
     
+    // SSO status indicator
+    let ssoInProgress = false;
+    
+    // Authentication state variables
+    let userAuthenticated = false;
+    let pendingUser = null;
+    
     // Check if we're on the login page or dashboard pages
     const isLoginPage = window.location.pathname.includes('login.html') || 
                         window.location.pathname === '/' || 
@@ -55,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const isConsumerPage = window.location.pathname.includes('consumer.html');
     const isDashboardPage = isProducerPage || isConsumerPage;
     
-    // First check for MetaMask connection
+    // For dashboard pages, we still need MetaMask
     if (isDashboardPage && (!isMetaMaskConnected || !connectedAccount)) {
         // Not connected to MetaMask, redirect to login
         window.location.href = 'login.html?metamask=required';
@@ -66,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (isLoginPage && window.location.search.includes('metamask=required')) {
         if (metamaskWarning) {
             metamaskWarning.style.display = 'block';
-            metamaskWarning.innerHTML = '<div class="alert alert-warning">Please connect your MetaMask wallet before logging in or registering.</div>';
+            metamaskWarning.innerHTML = '<div class="alert alert-warning">Please connect your MetaMask wallet before accessing the dashboard.</div>';
         }
     }
     
@@ -124,16 +133,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Reset validation
             loginForm.classList.remove('was-validated');
             
-            // Check if MetaMask is connected
-            if (!isMetaMaskConnected || !connectedAccount) {
-                showValidationError(loginEmail, 'Please connect your MetaMask wallet first');
-                if (metamaskWarning) {
-                    metamaskWarning.style.display = 'block';
-                    metamaskWarning.innerHTML = '<div class="alert alert-danger">Please connect your MetaMask wallet before continuing.</div>';
-                }
-                return;
-            }
-            
             // Validate form
             if (!validateEmail(loginEmail.value)) {
                 showValidationError(loginEmail, 'Please enter a valid email address');
@@ -159,23 +158,53 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Simulate verification (in a real app, this would call your API)
             // Check that the code is correct (in this demo we accept 123456)
             if (verificationCode.value !== '123456') {
                 showValidationError(verificationCode, 'Invalid verification code. Please try again.');
                 return;
             }
             
-            // Mock successful login
-            loginSuccessful({
+            // Authenticate the user
+            userAuthenticated = true;
+            
+            // Store pending user data (will be finalized after MetaMask connection)
+            pendingUser = {
                 name: 'Test User',
                 email: loginEmail.value,
-                userType: getUserTypeForWallet(connectedAccount),
-                walletAddress: connectedAccount
+                userType: 'unknown', // Will be determined after MetaMask connection
+                authenticated: true
+            };
+            
+            // Show successful login message
+            const successAlert = document.createElement('div');
+            successAlert.className = 'alert alert-success mt-3';
+            successAlert.innerHTML = 'Login successful! Now please connect your MetaMask wallet to continue.';
+            loginForm.appendChild(successAlert);
+            
+            // Hide the login form elements
+            loginForm.querySelectorAll('input, button').forEach(element => {
+                if (element.type !== 'submit') {
+                    element.disabled = true;
+                }
             });
             
-            // Redirect to appropriate dashboard
-            redirectLoggedInUser();
+            // Hide the login button and show a completion message
+            const loginButton = loginForm.querySelector('button[type="submit"]');
+            if (loginButton) {
+                loginButton.style.display = 'none';
+            }
+            
+            // Show and highlight the MetaMask section
+            if (metamaskSection) {
+                metamaskSection.classList.add('border', 'border-primary');
+                metamaskSection.scrollIntoView({ behavior: 'smooth' });
+                
+                // Add pulsing effect to the connect button
+                if (connectMetamaskBtn) {
+                    connectMetamaskBtn.classList.add('btn-lg');
+                    connectMetamaskBtn.classList.add('animate__animated', 'animate__pulse', 'animate__infinite');
+                }
+            }
         });
     }
     
@@ -236,16 +265,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Check if MetaMask is connected
-            if (!isMetaMaskConnected || !connectedAccount) {
-                showValidationError(loginEmail, 'Please connect your MetaMask wallet first');
-                if (metamaskWarning) {
-                    metamaskWarning.style.display = 'block';
-                    metamaskWarning.innerHTML = '<div class="alert alert-danger">Please connect your MetaMask wallet before continuing.</div>';
-                }
-                return;
-            }
-            
             // Simulate sending code (in a real app, this would call your API)
             sendCodeBtn.disabled = true;
             sendCodeBtn.textContent = 'Sending...';
@@ -259,66 +278,340 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Handle SSO with Google
-    if (googleLoginBtn) {
-        googleLoginBtn.addEventListener('click', function() {
-            // Check if MetaMask is connected first
-            if (!isMetaMaskConnected || !connectedAccount) {
-                alert('Please connect your MetaMask wallet before using SSO.');
-                if (metamaskWarning) {
-                    metamaskWarning.style.display = 'block';
-                    metamaskWarning.innerHTML = '<div class="alert alert-danger">Please connect your MetaMask wallet before continuing.</div>';
-                }
+    // Handle MetaMask connection after authentication
+    if (connectMetamaskBtn) {
+        connectMetamaskBtn.addEventListener('click', function() {
+            // Check if user is authenticated first
+            if (!userAuthenticated && !pendingUser) {
+                alert('Please login or register first before connecting your wallet.');
                 return;
             }
             
-            // In a real application, this would redirect to Google OAuth
-            alert('Redirecting to Google for authentication...');
+            // Connect to MetaMask
+            if (window.ethereum) {
+                window.ethereum.request({ method: 'eth_requestAccounts' })
+                    .then(function(accounts) {
+                        if (accounts.length > 0) {
+                            // Store the connected account
+                            const connectedAddress = accounts[0];
+                            localStorage.setItem('lastConnectedAccount', connectedAddress);
+                            window.isMetaMaskConnected = true;
+                            
+                            // Update UI
+                            if (metamaskStatus) {
+                                metamaskStatus.style.display = 'block';
+                                metamaskStatus.textContent = `Connected: ${connectedAddress.substring(0, 6)}...${connectedAddress.substring(38)}`;
+                            }
+                            
+                            if (connectMetamaskBtn) {
+                                connectMetamaskBtn.disabled = true;
+                                connectMetamaskBtn.textContent = 'Connected';
+                                connectMetamaskBtn.classList.remove('animate__animated', 'animate__pulse', 'animate__infinite');
+                            }
+                            
+                            // Complete user registration with the wallet address
+                            if (pendingUser) {
+                                // Determine user type based on wallet (this is simplified)
+                                pendingUser.userType = getUserTypeForWallet(connectedAddress);
+                                pendingUser.walletAddress = connectedAddress;
+                                
+                                // Store in localStorage
+                                loginSuccessful(pendingUser);
+                                
+                                // Show success message and redirect
+                                if (metamaskWarning) {
+                                    metamaskWarning.style.display = 'block';
+                                    metamaskWarning.innerHTML = '<div class="alert alert-success">Wallet connected successfully! Redirecting to your dashboard...</div>';
+                                }
+                                
+                                // Redirect to appropriate dashboard after a short delay
+                                setTimeout(redirectLoggedInUser, 2000);
+                            }
+                        }
+                    })
+                    .catch(function(error) {
+                        console.error(error);
+                        if (metamaskWarning) {
+                            metamaskWarning.style.display = 'block';
+                            metamaskWarning.innerHTML = `<div class="alert alert-danger">Error connecting to MetaMask: ${error.message}</div>`;
+                        }
+                    });
+            } else {
+                if (metamaskWarning) {
+                    metamaskWarning.style.display = 'block';
+                    metamaskWarning.innerHTML = '<div class="alert alert-warning">MetaMask is not installed. Please install MetaMask to continue.</div>';
+                }
+            }
+        });
+    }
+    
+    // Handle SSO with Google
+    if (googleLoginBtn) {
+        googleLoginBtn.addEventListener('click', function() {
+            // Prevent multiple clicks during SSO process
+            if (ssoInProgress) {
+                return;
+            }
             
-            // Simulate successful SSO login after 2 seconds
-            setTimeout(function() {
-                loginSuccessful({
-                    name: 'Google User',
-                    email: 'google.user@example.com',
-                    userType: getUserTypeForWallet(connectedAccount),
-                    walletAddress: connectedAccount
-                });
+            // Set SSO in progress
+            ssoInProgress = true;
+            googleLoginBtn.disabled = true;
+            googleLoginBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Connecting...';
+            
+            // In a real application, this would redirect to Google OAuth
+            // For this demo, we'll simulate the OAuth flow
+            
+            // Create a simple modal to simulate the Google login popup
+            const ssoModal = document.createElement('div');
+            ssoModal.className = 'modal fade';
+            ssoModal.id = 'ssoModal';
+            ssoModal.setAttribute('tabindex', '-1');
+            ssoModal.setAttribute('aria-hidden', 'true');
+            
+            ssoModal.innerHTML = `
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-light">
+                            <h5 class="modal-title">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" width="20" height="20" class="me-2">
+                                Sign in with Google
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="google-email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="google-email" value="google.user@example.com" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="google-password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="google-password" value="********" readonly>
+                            </div>
+                            <div class="alert alert-info">
+                                <small>This is a demo simulation of Google SSO. In a real application, you would be redirected to Google's secure login page.</small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="simulate-google-auth">Sign In</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(ssoModal);
+            
+            // Show the modal
+            const modalInstance = new bootstrap.Modal(ssoModal);
+            modalInstance.show();
+            
+            // Handle simulated auth
+            document.getElementById('simulate-google-auth').addEventListener('click', function() {
+                // Hide the modal
+                modalInstance.hide();
                 
-                // Redirect to appropriate dashboard
-                redirectLoggedInUser();
-            }, 2000);
+                // Show loading message
+                if (metamaskWarning) {
+                    metamaskWarning.style.display = 'block';
+                    metamaskWarning.innerHTML = '<div class="alert alert-info">Authenticating with Google...</div>';
+                }
+                
+                // Simulate SSO success after delay
+                setTimeout(function() {
+                    // Set user as authenticated
+                    userAuthenticated = true;
+                    
+                    // Store pending user info
+                    pendingUser = {
+                        name: 'Google User',
+                        email: 'google.user@example.com',
+                        userType: 'unknown', // To be determined after MetaMask connection
+                        ssoProvider: 'google',
+                        authenticated: true
+                    };
+                    
+                    // Show success message
+                    if (metamaskWarning) {
+                        metamaskWarning.style.display = 'block';
+                        metamaskWarning.innerHTML = '<div class="alert alert-success">Successfully authenticated with Google! Now please connect your MetaMask wallet to continue.</div>';
+                    }
+                    
+                    // Show and highlight the MetaMask section
+                    if (metamaskSection) {
+                        metamaskSection.classList.add('border', 'border-primary');
+                        metamaskSection.scrollIntoView({ behavior: 'smooth' });
+                        
+                        // Add pulsing effect to the connect button
+                        if (connectMetamaskBtn) {
+                            connectMetamaskBtn.classList.add('btn-lg');
+                            connectMetamaskBtn.classList.add('animate__animated', 'animate__pulse', 'animate__infinite');
+                        }
+                    }
+                    
+                    // Disable the login/register tabs and forms
+                    const authTabs = document.getElementById('authTabs');
+                    if (authTabs) {
+                        authTabs.querySelectorAll('button').forEach(button => {
+                            button.disabled = true;
+                        });
+                    }
+                    
+                    document.querySelectorAll('#login-form, #register-form').forEach(form => {
+                        form.querySelectorAll('input, button').forEach(element => {
+                            element.disabled = true;
+                        });
+                    });
+                }, 2000);
+            });
+            
+            // Reset state when modal is closed or canceled
+            ssoModal.addEventListener('hidden.bs.modal', function() {
+                resetSSOState(googleLoginBtn);
+                // Remove modal from DOM after it's hidden
+                ssoModal.remove();
+            });
         });
     }
     
     // Handle SSO with Microsoft
     if (microsoftLoginBtn) {
         microsoftLoginBtn.addEventListener('click', function() {
-            // Check if MetaMask is connected first
-            if (!isMetaMaskConnected || !connectedAccount) {
-                alert('Please connect your MetaMask wallet before using SSO.');
-                if (metamaskWarning) {
-                    metamaskWarning.style.display = 'block';
-                    metamaskWarning.innerHTML = '<div class="alert alert-danger">Please connect your MetaMask wallet before continuing.</div>';
-                }
+            // Prevent multiple clicks during SSO process
+            if (ssoInProgress) {
                 return;
             }
             
-            // In a real application, this would redirect to Microsoft OAuth
-            alert('Redirecting to Microsoft for authentication...');
+            // Set SSO in progress
+            ssoInProgress = true;
+            microsoftLoginBtn.disabled = true;
+            microsoftLoginBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Connecting...';
             
-            // Simulate successful SSO login after 2 seconds
-            setTimeout(function() {
-                loginSuccessful({
-                    name: 'Microsoft User',
-                    email: 'microsoft.user@example.com',
-                    userType: getUserTypeForWallet(connectedAccount),
-                    walletAddress: connectedAccount
-                });
+            // In a real application, this would redirect to Microsoft OAuth
+            // For this demo, we'll simulate the OAuth flow
+            
+            // Create a simple modal to simulate the Microsoft login popup
+            const ssoModal = document.createElement('div');
+            ssoModal.className = 'modal fade';
+            ssoModal.id = 'ssoModal';
+            ssoModal.setAttribute('tabindex', '-1');
+            ssoModal.setAttribute('aria-hidden', 'true');
+            
+            ssoModal.innerHTML = `
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-light">
+                            <h5 class="modal-title">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" alt="Microsoft" width="20" height="20" class="me-2">
+                                Sign in with Microsoft
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="microsoft-email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="microsoft-email" value="microsoft.user@example.com" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="microsoft-password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="microsoft-password" value="********" readonly>
+                            </div>
+                            <div class="alert alert-info">
+                                <small>This is a demo simulation of Microsoft SSO. In a real application, you would be redirected to Microsoft's secure login page.</small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="simulate-microsoft-auth">Sign In</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(ssoModal);
+            
+            // Show the modal
+            const modalInstance = new bootstrap.Modal(ssoModal);
+            modalInstance.show();
+            
+            // Handle simulated auth
+            document.getElementById('simulate-microsoft-auth').addEventListener('click', function() {
+                // Hide the modal
+                modalInstance.hide();
                 
-                // Redirect to appropriate dashboard
-                redirectLoggedInUser();
-            }, 2000);
+                // Show loading message
+                if (metamaskWarning) {
+                    metamaskWarning.style.display = 'block';
+                    metamaskWarning.innerHTML = '<div class="alert alert-info">Authenticating with Microsoft...</div>';
+                }
+                
+                // Simulate SSO success after delay
+                setTimeout(function() {
+                    // Set user as authenticated
+                    userAuthenticated = true;
+                    
+                    // Store pending user info
+                    pendingUser = {
+                        name: 'Microsoft User',
+                        email: 'microsoft.user@example.com',
+                        userType: 'unknown', // To be determined after MetaMask connection
+                        ssoProvider: 'microsoft',
+                        authenticated: true
+                    };
+                    
+                    // Show success message
+                    if (metamaskWarning) {
+                        metamaskWarning.style.display = 'block';
+                        metamaskWarning.innerHTML = '<div class="alert alert-success">Successfully authenticated with Microsoft! Now please connect your MetaMask wallet to continue.</div>';
+                    }
+                    
+                    // Show and highlight the MetaMask section
+                    if (metamaskSection) {
+                        metamaskSection.classList.add('border', 'border-primary');
+                        metamaskSection.scrollIntoView({ behavior: 'smooth' });
+                        
+                        // Add pulsing effect to the connect button
+                        if (connectMetamaskBtn) {
+                            connectMetamaskBtn.classList.add('btn-lg');
+                            connectMetamaskBtn.classList.add('animate__animated', 'animate__pulse', 'animate__infinite');
+                        }
+                    }
+                    
+                    // Disable the login/register tabs and forms
+                    const authTabs = document.getElementById('authTabs');
+                    if (authTabs) {
+                        authTabs.querySelectorAll('button').forEach(button => {
+                            button.disabled = true;
+                        });
+                    }
+                    
+                    document.querySelectorAll('#login-form, #register-form').forEach(form => {
+                        form.querySelectorAll('input, button').forEach(element => {
+                            element.disabled = true;
+                        });
+                    });
+                }, 2000);
+            });
+            
+            // Reset state when modal is closed or canceled
+            ssoModal.addEventListener('hidden.bs.modal', function() {
+                resetSSOState(microsoftLoginBtn);
+                // Remove modal from DOM after it's hidden
+                ssoModal.remove();
+            });
         });
+    }
+    
+    // Reset SSO button state
+    function resetSSOState(button) {
+        ssoInProgress = false;
+        if (button) {
+            button.disabled = false;
+            if (button.id === 'google-login') {
+                button.innerHTML = '<img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" class="sso-icon">Google';
+            } else if (button.id === 'microsoft-login') {
+                button.innerHTML = '<img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" alt="Microsoft" class="sso-icon">Microsoft';
+            }
+        }
     }
     
     // Handle registration form submission
@@ -328,16 +621,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Reset validation
             registerForm.classList.remove('was-validated');
-            
-            // Check if MetaMask is connected
-            if (!isMetaMaskConnected || !connectedAccount) {
-                alert('Please connect your MetaMask wallet before registering.');
-                if (metamaskWarning) {
-                    metamaskWarning.style.display = 'block';
-                    metamaskWarning.innerHTML = '<div class="alert alert-danger">Please connect your MetaMask wallet before continuing.</div>';
-                }
-                return;
-            }
             
             // Validate form
             let isValid = true;
@@ -415,23 +698,52 @@ document.addEventListener('DOMContentLoaded', function() {
                                 return;
                             }
                             
-                            // Register the user with their wallet address
+                            // Set user as authenticated
+                            userAuthenticated = true;
+                            
+                            // Determine user type from radio button
                             const userType = producerType.checked ? 'producer' : 'consumer';
                             
-                            // Store the wallet association
-                            loginSuccessful({
+                            // Store pending user data (will be finalized after MetaMask connection)
+                            pendingUser = {
                                 name: registerName.value,
                                 email: registerEmail.value,
                                 mobile: registerMobile.value,
                                 userType: userType,
-                                walletAddress: connectedAccount
+                                authenticated: true,
+                                registrationDate: new Date().toISOString()
+                            };
+                            
+                            // Show success message
+                            const successAlert = document.createElement('div');
+                            successAlert.className = 'alert alert-success mt-3';
+                            successAlert.innerHTML = 'Registration successful! Now please connect your MetaMask wallet to continue.';
+                            registerForm.appendChild(successAlert);
+                            
+                            // Hide or disable the form elements
+                            registerForm.querySelectorAll('input, button').forEach(element => {
+                                element.disabled = true;
                             });
                             
-                            // Register on the blockchain if needed (for real implementation)
-                            // This would call contract.methods.registerProducer or registerConsumer
+                            // Show and highlight the MetaMask section
+                            if (metamaskSection) {
+                                metamaskSection.classList.add('border', 'border-primary');
+                                metamaskSection.scrollIntoView({ behavior: 'smooth' });
+                                
+                                // Add pulsing effect to the connect button
+                                if (connectMetamaskBtn) {
+                                    connectMetamaskBtn.classList.add('btn-lg');
+                                    connectMetamaskBtn.classList.add('animate__animated', 'animate__pulse', 'animate__infinite');
+                                }
+                            }
                             
-                            alert('Registration successful! You will be redirected to your dashboard.');
-                            redirectLoggedInUser();
+                            // Disable the login/register tabs
+                            const authTabs = document.getElementById('authTabs');
+                            if (authTabs) {
+                                authTabs.querySelectorAll('button').forEach(button => {
+                                    button.disabled = true;
+                                });
+                            }
                         }
                     });
                 }

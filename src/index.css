@@ -3,8 +3,7 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f8f9fa;
@@ -15,33 +14,110 @@ body {
 }
 
 .card {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
+  border: none;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-header {
+  font-weight: 600;
+  padding: 1rem 1.25rem;
+}
+
+.btn {
+  border-radius: 4px;
+  font-weight: 500;
 }
 
 .btn-action {
-  margin-right: 5px;
+  min-width: 120px;
 }
 
-/* Timeline styles */
-.timeline-event {
-  border-left: 3px solid #0d6efd;
-  padding-left: 20px;
-  margin-bottom: 15px;
+/* Timeline Styles for Product Tracking */
+.timeline {
   position: relative;
+  margin: 20px 0;
+  padding-left: 30px;
 }
 
-.timeline-event:before {
+.timeline::before {
   content: '';
-  display: block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: #0d6efd;
   position: absolute;
-  left: -7px;
+  left: 10px;
   top: 5px;
+  bottom: 5px;
+  width: 2px;
+  background-color: #e9ecef;
 }
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 20px;
+}
+
+.timeline-marker {
+  position: absolute;
+  left: -30px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #007bff;
+  border: 4px solid #f8f9fa;
+}
+
+.timeline-content {
+  padding: 15px;
+  background-color: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+/* Form Styles */
+.form-control:focus {
+  border-color: #80bdff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Wallet Connection Styles */
+#wallet-info {
+  font-family: monospace;
+  padding: 0.5rem;
+  border-radius: 4px;
+  color: #28a745;
+  background-color: rgba(40, 167, 69, 0.1);
+}
+
+/* Role Registration Styling */
+#role-registration {
+  background-color: #fff;
+  transition: all 0.3s ease;
+}
+
+/* Dashboard Card Styling */
+.dashboard-card {
+  transition: transform 0.2s;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-5px);
+}
+
+/* Verification Result Styling */
+#verification-result {
+  transition: all 0.3s ease;
+}
+
+/* Product Status Colors */
+.status-created { color: #6c757d; }
+.status-produced { color: #007bff; }
+.status-shipped { color: #fd7e14; }
+.status-received { color: #17a2b8; }
+.status-available { color: #28a745; }
+.status-sold { color: #dc3545; }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
