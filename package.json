@@ -1,12 +1,40 @@
 {
   "name": "supply-chain-dapp",
   "version": "1.0.0",
-  "description": "",
+  "description": "Decentralized Supply Chain Management System",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "webpack-dev-server --mode development --open",
+    "build": "webpack --mode production",
+    "test": "mocha --timeout 10000"
   },
-  "keywords": [],
+  "keywords": [
+    "blockchain",
+    "supply-chain",
+    "dapp",
+    "ethereum",
+    "web3"
+  ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "web3": "^1.8.2",
+    "bootstrap": "^5.2.3",
+    "qrcode": "^1.5.1",
+    "sweetalert2": "^11.7.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.12",
+    "@babel/preset-env": "^7.20.2",
+    "babel-loader": "^9.1.2",
+    "css-loader": "^6.7.3",
+    "file-loader": "^6.2.0",
+    "html-webpack-plugin": "^5.5.0",
+    "style-loader": "^3.3.1",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1",
+    "webpack-dev-server": "^4.11.1",
+    "mocha": "^10.2.0",
+    "chai": "^4.3.7"
+  }
 }
