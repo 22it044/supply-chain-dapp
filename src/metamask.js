@@ -4,6 +4,14 @@
 window.isMetaMaskConnected = false;
 window.contractAddress = "0xd9145CCE52D386f254917e481eB44e9943F39138";
 
+// Import auth functions if available
+let authFunctions = null;
+try {
+    authFunctions = require('./auth');
+} catch (e) {
+    console.log('Auth module not available, using localStorage directly.');
+}
+
 // Store user role
 let userRole = '';
 
@@ -71,8 +79,22 @@ function waitForMetaMask(callback, maxWaitTime = 3000, checkInterval = 100) {
     function alertNoMetaMask() {
         console.error('MetaMask extension not detected');
         alert('MetaMask extension not detected. Please install MetaMask and refresh the page.');
-        document.getElementById('connection-status').textContent = 'MetaMask Not Found';
-        document.getElementById('connection-status').classList.add('text-danger');
+        
+        // Update UI if elements exist
+        const connectionStatus = document.getElementById('connection-status');
+        if (connectionStatus) {
+            connectionStatus.textContent = 'MetaMask Not Found';
+            connectionStatus.classList.add('text-danger');
+        }
+        
+        // Redirect to login page if on dashboard
+        const isLoginPage = window.location.pathname.includes('login.html') || 
+                          window.location.pathname === '/' || 
+                          window.location.pathname.endsWith('index.html');
+        
+        if (!isLoginPage) {
+            window.location.href = 'login.html?metamask=required';
+        }
     }
     
     // Simple provider detection function
@@ -154,6 +176,9 @@ async function connectMetaMask() {
         
         showMessage('Successfully connected to MetaMask', 'success');
         
+        // Check if we need to verify user authentication status
+        verifyUserAuthentication(connectedAccount);
+        
         // Check if we're on producer page and need to handle producer-specific logic
         if (typeof handleProducerAfterConnection === 'function') {
             console.log("Found producer handler, calling it with account:", connectedAccount);
@@ -181,6 +206,27 @@ async function connectMetaMask() {
     }
 }
 
+// Verify if the user authentication matches the MetaMask account
+function verifyUserAuthentication(account) {
+    // If we have auth functions, use them
+    if (authFunctions && authFunctions.isUserLoggedIn()) {
+        const user = authFunctions.getCurrentUser();
+        if (user && user.walletAddress !== account) {
+            // Wallet address doesn't match the authenticated user
+            authFunctions.logout();
+            
+            // Check if we're on a dashboard page
+            const isLoginPage = window.location.pathname.includes('login.html') || 
+                              window.location.pathname === '/' || 
+                              window.location.pathname.endsWith('index.html');
+            
+            if (!isLoginPage) {
+                window.location.href = 'login.html?wallet=mismatch';
+            }
+        }
+    }
+}
+
 // Handle account changes in MetaMask
 function handleAccountsChanged(accounts) {
     console.log("Accounts changed:", accounts);
@@ -192,6 +238,9 @@ function handleAccountsChanged(accounts) {
         // User switched accounts
         const newAccount = accounts[0];
         localStorage.setItem('lastConnectedAccount', newAccount);
+        
+        // Verify user authentication with the new account
+        verifyUserAuthentication(newAccount);
         
         // Update UI
         updateStatusDisplay({
@@ -234,7 +283,11 @@ async function disconnectMetaMask() {
         
         // Clear saved account
         localStorage.removeItem('lastConnectedAccount');
-        localStorage.removeItem('userRole');
+        
+        // Also log out the user if they were authenticated
+        if (authFunctions && authFunctions.isUserLoggedIn()) {
+            authFunctions.logout();
+        }
         
         // Reset global state
         window.isMetaMaskConnected = false;
@@ -249,55 +302,76 @@ async function disconnectMetaMask() {
         
         showMessage('Successfully disconnected from MetaMask', 'info');
         
-        // Reload the page to reset all state
-        setTimeout(() => {
-            window.location.reload();
-        }, 1500);
+        // Redirect to login page if on dashboard
+        const isLoginPage = window.location.pathname.includes('login.html') || 
+                          window.location.pathname === '/' || 
+                          window.location.pathname.endsWith('index.html');
         
+        if (!isLoginPage) {
+            window.location.href = 'login.html';
+        }
+        
+        return true;
     } catch (error) {
-        console.error("Failed to disconnect from MetaMask:", error);
-        showMessage('Failed to disconnect: ' + error.message, 'danger');
+        console.error("Error disconnecting from MetaMask:", error);
+        
+        updateStatusDisplay({
+            type: 'danger',
+            message: 'Error disconnecting'
+        });
+        
+        showMessage('Error disconnecting from MetaMask: ' + error.message, 'danger');
+        return false;
     }
 }
 
-// Function to check if already connected
+// Check if MetaMask is already connected
 async function checkConnection() {
-    console.log("Checking existing connection...");
+    console.log("Checking MetaMask connection...");
     
-    // If user explicitly disconnected, don't auto-connect
-    if (localStorage.getItem('explicitly_disconnected') === 'true') {
-        console.log("User explicitly disconnected previously, not auto-connecting");
-        return null;
-    }
-    
+    // If MetaMask is not available, return immediately
     if (typeof window.ethereum === 'undefined') {
-        console.log("MetaMask not installed");
-        updateStatusDisplay({
-            type: 'danger',
-            message: 'MetaMask not installed'
-        });
-        return null;
+        console.error("MetaMask is not installed");
+        return false;
     }
     
     try {
-        // Get currently connected accounts
+        // Check if user has explicitly disconnected
+        const explicitlyDisconnected = localStorage.getItem('explicitly_disconnected') === 'true';
+        if (explicitlyDisconnected) {
+            console.log("User explicitly disconnected previously, not reconnecting automatically");
+            ensureDisconnectedState();
+            return false;
+        }
+        
+        // Check if we have the account already saved
+        const savedAccount = localStorage.getItem('lastConnectedAccount');
+        if (!savedAccount) {
+            console.log("No previously connected account found");
+            ensureDisconnectedState();
+            return false;
+        }
+        
+        // Get accounts that are already connected
         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         
         if (accounts.length === 0) {
-            console.log("No accounts connected");
-            updateStatusDisplay({
-                type: 'warning',
-                message: 'Not connected to MetaMask'
-            });
-            return null;
+            console.log("No accounts connected to this site");
+            ensureDisconnectedState();
+            return false;
         }
         
-        // We have a connected account
-        const connectedAccount = accounts[0];
-        console.log("Already connected with account:", connectedAccount);
+        // Check if the first account matches our saved account
+        const currentAccount = accounts[0];
+        if (currentAccount.toLowerCase() !== savedAccount.toLowerCase()) {
+            console.log("Connected account doesn't match saved account, updating");
+            localStorage.setItem('lastConnectedAccount', currentAccount);
+            
+            // Verify user authentication with the current account
+            verifyUserAuthentication(currentAccount);
+        }
         
-        // Save the connected account
-        localStorage.setItem('lastConnectedAccount', connectedAccount);
+        // We are connected
         window.isMetaMaskConnected = true;
         
         // Initialize Web3 with current provider
@@ -309,154 +383,178 @@ async function checkConnection() {
             window.contractAddress
         );
         
-        // Update UI to show connected state
+        // Set up event listeners
+        window.ethereum.on('accountsChanged', handleAccountsChanged);
+        window.ethereum.on('chainChanged', () => window.location.reload());
+        
+        // Update UI
         updateStatusDisplay({
             type: 'success',
             message: 'Connected to MetaMask'
         });
         
-        // Add event listeners for account changes
-        window.ethereum.on('accountsChanged', handleAccountsChanged);
-        window.ethereum.on('chainChanged', () => window.location.reload());
+        // Check if we need to update UI with role-specific content
+        await checkUserRole(currentAccount);
         
-        // Check if we're on producer page and need to handle producer-specific logic
-        if (typeof handleProducerAfterConnection === 'function') {
-            console.log("Found producer handler, calling it with account:", connectedAccount);
-            await handleProducerAfterConnection(connectedAccount);
-        }
-        
-        // Check if we're on consumer page and need to handle consumer-specific logic
-        if (typeof handleConsumerAfterConnection === 'function') {
-            console.log("Found consumer handler, calling it with account:", connectedAccount);
-            await handleConsumerAfterConnection(connectedAccount);
-        }
-        
-        return connectedAccount;
+        return true;
     } catch (error) {
-        console.error("Error checking connection:", error);
-        return null;
+        console.error("Error checking MetaMask connection:", error);
+        ensureDisconnectedState();
+        return false;
     }
 }
 
-// Helper for Connect button
+// Function to handle connect button click
 async function connectClickHandler() {
-    const connectButton = document.getElementById('connect-button');
-    const disconnectButton = document.getElementById('disconnect-button');
+    console.log("Connect button clicked");
     
-    // Disable connect button while connecting
-    if (connectButton) {
-        connectButton.disabled = true;
-        connectButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Connecting...';
+    // Get UI elements
+    const connectBtn = document.getElementById('connect-button');
+    const disconnectBtn = document.getElementById('disconnect-button');
+    
+    // If already connected, just update UI
+    if (window.isMetaMaskConnected) {
+        console.log("Already connected, updating UI");
+        
+        // If we have disconnect button, show it
+        if (disconnectBtn) {
+            connectBtn.style.display = 'none';
+            disconnectBtn.style.display = 'block';
+        } else {
+            // Otherwise update connect button to show connected state
+            connectBtn.textContent = 'Connected to MetaMask';
+            connectBtn.classList.remove('btn-primary');
+            connectBtn.classList.add('btn-success');
+        }
+        
+        return true;
     }
     
-    try {
-        // Try to connect
-        const account = await connectMetaMask();
+    // Otherwise try to connect
+    const connected = await connectMetaMask();
+    
+    // Update UI based on connection result
+    if (connected) {
+        console.log("Connection successful, updating UI");
         
-        if (account) {
-            // If connected successfully, hide connect button and show disconnect
-            if (connectButton) {
-                connectButton.style.display = 'none';
-            }
-            if (disconnectButton) {
-                disconnectButton.style.display = 'block';
-            }
-            
-            // Update account display (if element exists)
-            const accountDisplay = document.getElementById('account-display');
-            if (accountDisplay) {
-                accountDisplay.textContent = `${account.substring(0, 6)}...${account.substring(account.length - 4)}`;
-                accountDisplay.style.display = 'block';
-            }
+        // If we have disconnect button, show it
+        if (disconnectBtn) {
+            connectBtn.style.display = 'none';
+            disconnectBtn.style.display = 'block';
+        } else {
+            // Otherwise update connect button to show connected state
+            connectBtn.textContent = 'Connected to MetaMask';
+            connectBtn.classList.remove('btn-primary');
+            connectBtn.classList.add('btn-success');
         }
-    } finally {
-        // Re-enable the connect button when done
-        if (connectButton) {
-            connectButton.disabled = false;
-            connectButton.innerHTML = 'Connect MetaMask';
-        }
+        
+        return true;
+    } else {
+        console.log("Connection failed");
+        return false;
     }
 }
 
-// Helper for Disconnect button
+// Function to handle disconnect button click
 async function disconnectClickHandler() {
-    const connectButton = document.getElementById('connect-button');
-    const disconnectButton = document.getElementById('disconnect-button');
+    console.log("Disconnect button clicked");
     
-    // Disable disconnect button while disconnecting
-    if (disconnectButton) {
-        disconnectButton.disabled = true;
-        disconnectButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Disconnecting...';
+    // Get UI elements
+    const connectBtn = document.getElementById('connect-button');
+    const disconnectBtn = document.getElementById('disconnect-button');
+    
+    // If not connected, just update UI
+    if (!window.isMetaMaskConnected) {
+        console.log("Not connected, updating UI");
+        
+        // If we have disconnect button, hide it
+        if (disconnectBtn) {
+            connectBtn.style.display = 'block';
+            disconnectBtn.style.display = 'none';
+        } else {
+            // Otherwise update connect button to show disconnected state
+            connectBtn.textContent = 'Connect MetaMask';
+            connectBtn.classList.remove('btn-success');
+            connectBtn.classList.add('btn-primary');
+        }
+        
+        return true;
     }
     
-    try {
-        // Try to disconnect
-        await disconnectMetaMask();
+    // Otherwise try to disconnect
+    const disconnected = await disconnectMetaMask();
+    
+    // Update UI based on disconnection result
+    if (disconnected) {
+        console.log("Disconnection successful, updating UI");
         
-        // After disconnect, show connect button and hide disconnect
-        if (connectButton) {
-            connectButton.style.display = 'block';
-        }
-        if (disconnectButton) {
-            disconnectButton.style.display = 'none';
+        // If we have disconnect button, hide it
+        if (disconnectBtn) {
+            connectBtn.style.display = 'block';
+            disconnectBtn.style.display = 'none';
+        } else {
+            // Otherwise update connect button to show disconnected state
+            connectBtn.textContent = 'Connect MetaMask';
+            connectBtn.classList.remove('btn-success');
+            connectBtn.classList.add('btn-primary');
         }
         
-        // Hide account display (if element exists)
-        const accountDisplay = document.getElementById('account-display');
-        if (accountDisplay) {
-            accountDisplay.textContent = '';
-            accountDisplay.style.display = 'none';
-        }
-    } finally {
-        // Re-enable the disconnect button when done
-        if (disconnectButton) {
-            disconnectButton.disabled = false;
-            disconnectButton.innerHTML = 'Disconnect';
-        }
+        return true;
+    } else {
+        console.log("Disconnection failed");
+        return false;
     }
 }
 
-// Function to ensure the UI shows the disconnected state
+// Ensure the UI reflects disconnected state
 function ensureDisconnectedState() {
-    // Show connect button and hide disconnect
-    const connectButton = document.getElementById('connect-button');
-    const disconnectButton = document.getElementById('disconnect-button');
+    // Reset global state
+    window.isMetaMaskConnected = false;
+    window.web3 = null;
+    window.contract = null;
     
-    if (connectButton) {
-        connectButton.style.display = 'block';
-    }
-    if (disconnectButton) {
-        disconnectButton.style.display = 'none';
-    }
+    // Update UI
+    updateStatusDisplay({
+        type: 'info',
+        message: 'Not connected to MetaMask'
+    });
     
-    // Hide account display
-    const accountDisplay = document.getElementById('account-display');
-    if (accountDisplay) {
-        accountDisplay.textContent = '';
-        accountDisplay.style.display = 'none';
+    // Get UI elements
+    const connectBtn = document.getElementById('connect-button');
+    const disconnectBtn = document.getElementById('disconnect-button');
+    
+    // Update button visibility
+    if (connectBtn && disconnectBtn) {
+        connectBtn.style.display = 'block';
+        disconnectBtn.style.display = 'none';
+        
+        connectBtn.textContent = 'Connect MetaMask';
+        connectBtn.classList.remove('btn-success');
+        connectBtn.classList.add('btn-primary');
     }
 }
 
-// Update UI status elements
+// Update connection status display
 function updateStatusDisplay(typeOrConfig, message) {
+    // Get status display element
     const statusElement = document.getElementById('connection-status');
     if (!statusElement) return;
     
-    let type, statusMessage;
+    // Parse arguments
+    let type, displayMessage;
     
-    // Handle both old and new calling conventions
     if (typeof typeOrConfig === 'object') {
         type = typeOrConfig.type;
-        statusMessage = typeOrConfig.message;
+        displayMessage = typeOrConfig.message;
     } else {
         type = typeOrConfig;
-        statusMessage = message;
+        displayMessage = message;
     }
     
-    // Remove all existing status classes
-    statusElement.classList.remove('text-success', 'text-warning', 'text-danger', 'text-info');
+    // Remove all previous status classes
+    statusElement.classList.remove('text-success', 'text-warning', 'text-info', 'text-danger');
     
-    // Add appropriate class based on status type
+    // Add appropriate class based on type
     switch (type) {
         case 'success':
             statusElement.classList.add('text-success');
@@ -464,133 +562,218 @@ function updateStatusDisplay(typeOrConfig, message) {
         case 'warning':
             statusElement.classList.add('text-warning');
             break;
+        case 'info':
+            statusElement.classList.add('text-info');
+            break;
         case 'danger':
             statusElement.classList.add('text-danger');
             break;
-        case 'info':
-        default:
-            statusElement.classList.add('text-info');
-            break;
     }
     
-    // Update text content
-    statusElement.textContent = statusMessage;
+    // Set message text
+    statusElement.textContent = displayMessage;
     
-    // Also update wallet address display if it exists
-    if (type === 'success' && window.isMetaMaskConnected) {
-        const addressElement = document.getElementById('wallet-address');
-        if (addressElement) {
+    // If we also have a wallet info element, update it
+    const walletInfoElement = document.getElementById('wallet-info');
+    if (walletInfoElement) {
+        // If connected, show address
+        if (type === 'success' && window.isMetaMaskConnected) {
             const account = localStorage.getItem('lastConnectedAccount');
             if (account) {
-                addressElement.textContent = `${account.substring(0, 6)}...${account.substring(account.length - 4)}`;
+                const shortenedAddress = account.substring(0, 6) + '...' + account.substring(38);
+                walletInfoElement.textContent = 'Wallet: ' + shortenedAddress;
+                walletInfoElement.style.display = 'block';
             }
+        } else {
+            // Otherwise hide wallet info
+            walletInfoElement.style.display = 'none';
         }
     }
 }
 
-// General message display function
+// Show toast message
 function showMessage(message, type = 'info') {
-    // Check for toast container
+    // Try to find existing toast container
     let toastContainer = document.getElementById('toast-container');
     
-    // Create toast container if it doesn't exist
+    // Create container if it doesn't exist
     if (!toastContainer) {
         toastContainer = document.createElement('div');
         toastContainer.id = 'toast-container';
-        toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
-        toastContainer.style.zIndex = '5';
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
         document.body.appendChild(toastContainer);
     }
     
-    // Create toast element
-    const toastId = `toast-${Date.now()}`;
-    const toastEl = document.createElement('div');
-    toastEl.id = toastId;
-    toastEl.className = `toast align-items-center border-0 show`;
-    toastEl.setAttribute('role', 'alert');
-    toastEl.setAttribute('aria-live', 'assertive');
-    toastEl.setAttribute('aria-atomic', 'true');
+    // Create a new toast
+    const toastId = 'toast-' + Date.now();
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = 'toast';
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
     
-    // Set background class based on type
+    // Add appropriate color class based on type
+    let bgClass = 'bg-info';
     switch (type) {
         case 'success':
-            toastEl.classList.add('bg-success', 'text-white');
-            break;
-        case 'danger':
-            toastEl.classList.add('bg-danger', 'text-white');
+            bgClass = 'bg-success';
             break;
         case 'warning':
-            toastEl.classList.add('bg-warning', 'text-dark');
+            bgClass = 'bg-warning';
             break;
-        case 'info':
-        default:
-            toastEl.classList.add('bg-info', 'text-white');
+        case 'danger':
+            bgClass = 'bg-danger';
             break;
     }
     
-    // Create toast content
-    toastEl.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">
-                ${message}
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    // Set toast content
+    toast.innerHTML = `
+        <div class="toast-header ${bgClass} text-white">
+            <strong class="me-auto">MetaMask</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            ${message}
         </div>
     `;
     
     // Add toast to container
-    toastContainer.appendChild(toastEl);
+    toastContainer.appendChild(toast);
     
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-        toastEl.remove();
-    }, 3000);
+    // Initialize and show toast
+    try {
+        // Try using Bootstrap's JS API
+        new bootstrap.Toast(toast, { autohide: true, delay: 5000 }).show();
+    } catch (e) {
+        // Fallback to manual implementation
+        console.log('Bootstrap Toast not available, using fallback');
+        toast.classList.add('show');
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            
+            // Remove from DOM after fade out
+            setTimeout(() => {
+                if (toastContainer.contains(toast)) {
+                    toastContainer.removeChild(toast);
+                }
+                
+                // Remove container if empty
+                if (toastContainer.children.length === 0) {
+                    document.body.removeChild(toastContainer);
+                }
+            }, 500);
+        }, 5000);
+        
+        // Handle close button
+        const closeBtn = toast.querySelector('.btn-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                toast.classList.remove('show');
+                
+                // Remove from DOM after fade out
+                setTimeout(() => {
+                    if (toastContainer.contains(toast)) {
+                        toastContainer.removeChild(toast);
+                    }
+                    
+                    // Remove container if empty
+                    if (toastContainer.children.length === 0) {
+                        document.body.removeChild(toastContainer);
+                    }
+                }, 500);
+            });
+        }
+    }
 }
 
-// Function to check and set user role
+// Check user role on the blockchain
 async function checkUserRole(account) {
+    if (!window.isMetaMaskConnected || !window.contract) {
+        console.log("Not connected or contract not initialized");
+        return null;
+    }
+    
     try {
-        const isProducer = await window.contract.methods.isProducerRegistered(account).call();
-        
+        // Try to get user role from contract
+        // First check if user is a producer
+        const isProducer = await window.contract.methods.isProducer(account).call();
         if (isProducer) {
             setUserRole('producer');
             return 'producer';
-        } else {
+        }
+        
+        // Then check if user is a consumer
+        const isConsumer = await window.contract.methods.isConsumer(account).call();
+        if (isConsumer) {
             setUserRole('consumer');
             return 'consumer';
         }
+        
+        // User is not registered yet
+        setUserRole('');
+        return null;
     } catch (error) {
         console.error("Error checking user role:", error);
         return null;
     }
 }
 
-// User role management
+// Set user role
 function setUserRole(role) {
     userRole = role;
     localStorage.setItem('userRole', role);
 }
 
+// Get user role
 function getUserRole() {
-    if (userRole) return userRole;
-    return localStorage.getItem('userRole') || null;
+    // First check local variable
+    if (userRole) {
+        return userRole;
+    }
+    
+    // Then check localStorage
+    const savedRole = localStorage.getItem('userRole');
+    if (savedRole) {
+        userRole = savedRole;
+        return savedRole;
+    }
+    
+    // No role found
+    return null;
 }
 
-// Initialize on DOM content loaded
+// Initialize the MetaMask connection when the page loads
 document.addEventListener('DOMContentLoaded', function() {
-    waitForMetaMask(() => {
-        checkConnection();
-        
-        // Set up connect and disconnect button handlers
-        const connectButton = document.getElementById('connect-button');
-        const disconnectButton = document.getElementById('disconnect-button');
-        
-        if (connectButton) {
-            connectButton.addEventListener('click', connectClickHandler);
-        }
-        
-        if (disconnectButton) {
-            disconnectButton.addEventListener('click', disconnectClickHandler);
-        }
+    console.log('DOM loaded, initializing MetaMask connection');
+    
+    // Set up event listeners for connect/disconnect buttons
+    const connectBtn = document.getElementById('connect-button');
+    if (connectBtn) {
+        connectBtn.addEventListener('click', connectClickHandler);
+    }
+    
+    const disconnectBtn = document.getElementById('disconnect-button');
+    if (disconnectBtn) {
+        disconnectBtn.addEventListener('click', disconnectClickHandler);
+    }
+    
+    // Get MetaMask status
+    waitForMetaMask(async () => {
+        console.log('MetaMask is available, checking connection');
+        const isConnected = await checkConnection();
+        console.log(`Initial connection check: ${isConnected ? 'Connected' : 'Not connected'}`);
     });
-}); 
+});
+
+// Export functions for use in other modules
+export {
+    connectMetaMask,
+    disconnectMetaMask,
+    checkConnection,
+    checkUserRole,
+    getUserRole,
+    setUserRole
+}; 

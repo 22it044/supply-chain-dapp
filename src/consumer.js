@@ -676,3 +676,9 @@ function verifyProduct() {
         $('#verification-result').html('<div class="alert alert-danger">Error verifying product!</div>');
     });
 }
+
+// Logout function
+function logout() {
+    localStorage.removeItem('currentUser');
+    window.location.href = 'login.html';
+}
