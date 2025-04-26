@@ -1,217 +1,89 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Supply Chain Management DApp"
-    />
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <title>Supply Chain DApp</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Welcome to Firebase Hosting</title>
+
+    <!-- update the version number as needed -->
+    <script defer src="/__/firebase/11.6.1/firebase-app-compat.js"></script>
+    <!-- include only the Firebase features as you need -->
+    <script defer src="/__/firebase/11.6.1/firebase-auth-compat.js"></script>
+    <script defer src="/__/firebase/11.6.1/firebase-database-compat.js"></script>
+    <script defer src="/__/firebase/11.6.1/firebase-firestore-compat.js"></script>
+    <script defer src="/__/firebase/11.6.1/firebase-functions-compat.js"></script>
+    <script defer src="/__/firebase/11.6.1/firebase-messaging-compat.js"></script>
+    <script defer src="/__/firebase/11.6.1/firebase-storage-compat.js"></script>
+    <script defer src="/__/firebase/11.6.1/firebase-analytics-compat.js"></script>
+    <script defer src="/__/firebase/11.6.1/firebase-remote-config-compat.js"></script>
+    <script defer src="/__/firebase/11.6.1/firebase-performance-compat.js"></script>
+    <!-- 
+      initialize the SDK after all desired features are loaded, set useEmulator to false
+      to avoid connecting the SDK to running emulators.
+    -->
+    <script defer src="/__/firebase/init.js?useEmulator=true"></script>
+
+    <style media="screen">
+      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
+      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px; border-radius: 3px; }
+      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
+      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
+      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
+      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
+      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
+      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
+      @media (max-width: 600px) {
+        body, #message { margin-top: 0; background: white; box-shadow: none; }
+        body { border-top: 16px solid #ffa100; }
+      }
+    </style>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div class="container">
-        <a class="navbar-brand" href="index.html">Supply Chain DApp</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-          <ul class="navbar-nav me-auto">
-            <li class="nav-item">
-              <a class="nav-link active" href="index.html">Home</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="producer.html">Producer Dashboard</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="consumer.html">Consumer Dashboard</a>
-            </li>
-          </ul>
-          <div class="d-flex align-items-center">
-            <span class="text-light me-3" id="user-status">Not Logged In</span>
-            <button id="login-button" class="btn btn-outline-light btn-sm">Login</button>
-            <button id="register-button" class="btn btn-outline-success btn-sm ms-2">Register</button>
-            <span class="text-light mx-3" id="metamask-status" style="display: none;">MetaMask: <span id="connection-status">Not Connected</span></span>
-            <span class="text-light me-3 d-none d-md-inline" id="wallet-info" style="display: none;">Wallet: <span id="wallet-address"></span></span>
-            <button id="connect-button" class="btn btn-outline-light btn-sm" style="display: none;">Connect MetaMask</button>
-            <button id="disconnect-button" class="btn btn-outline-danger btn-sm ms-2" style="display: none;">Disconnect</button>
-          </div>
-        </div>
-      </div>
-    </nav>
-    
-    <!-- Login Modal -->
-    <div class="modal fade" id="login-modal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Login</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <form id="login-form">
-              <div class="mb-3">
-                <label for="login-email" class="form-label">Email address</label>
-                <input type="email" class="form-control" id="login-email" required>
-                <div class="invalid-feedback">Please provide a valid email.</div>
-              </div>
-              <div class="mb-3">
-                <label for="login-password" class="form-label">Password</label>
-                <input type="password" class="form-control" id="login-password" required>
-                <div class="invalid-feedback">Password is required.</div>
-              </div>
-              <div class="mb-3" id="verification-code-section" style="display: none;">
-                <label for="verification-code" class="form-label">Verification Code</label>
-                <div class="input-group">
-                  <input type="text" class="form-control" id="verification-code">
-                  <button class="btn btn-outline-secondary" type="button" id="send-code-btn">Send Code</button>
-                </div>
-                <div class="form-text">We'll send a verification code to your email/mobile.</div>
-              </div>
-              <div class="d-flex justify-content-between align-items-center">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="remember-me">
-                  <label class="form-check-label" for="remember-me">Remember me</label>
-                </div>
-                <a href="#" id="forgot-password">Forgot password?</a>
-              </div>
-              <hr>
-              <div class="d-grid gap-2">
-                <button type="submit" class="btn btn-primary">Login</button>
-                <div class="text-center">OR</div>
-                <button type="button" class="btn btn-outline-dark" id="sso-google">
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" width="20" height="20" class="me-2">
-                  Continue with Google
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
+    <div id="message">
+      <h2>Welcome</h2>
+      <h1>Firebase Hosting Setup Complete</h1>
+      <p>You're seeing this because you've successfully setup Firebase Hosting. Now it's time to go build something extraordinary!</p>
+      <a target="_blank" href="https://firebase.google.com/docs/hosting/">Open Hosting Documentation</a>
     </div>
-    
-    <!-- Registration Modal -->
-    <div class="modal fade" id="register-modal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Register</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <form id="register-form" class="needs-validation" novalidate>
-              <div class="mb-3">
-                <label for="register-name" class="form-label">Full Name</label>
-                <input type="text" class="form-control" id="register-name" required>
-                <div class="invalid-feedback">Name is required.</div>
-              </div>
-              <div class="mb-3">
-                <label for="register-email" class="form-label">Email address</label>
-                <input type="email" class="form-control" id="register-email" required>
-                <div class="invalid-feedback">Please provide a valid email.</div>
-              </div>
-              <div class="mb-3">
-                <label for="register-mobile" class="form-label">Mobile Number</label>
-                <input type="tel" class="form-control" id="register-mobile" pattern="[0-9]{10}" required>
-                <div class="invalid-feedback">Please provide a valid 10-digit mobile number.</div>
-              </div>
-              <div class="mb-3">
-                <label for="register-password" class="form-label">Password</label>
-                <input type="password" class="form-control" id="register-password" minlength="8" required>
-                <div class="invalid-feedback">Password must be at least 8 characters.</div>
-              </div>
-              <div class="mb-3">
-                <label for="confirm-password" class="form-label">Confirm Password</label>
-                <input type="password" class="form-control" id="confirm-password" required>
-                <div class="invalid-feedback">Passwords do not match.</div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Register as</label>
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="user-type" id="producer-type" value="producer" required>
-                  <label class="form-check-label" for="producer-type">Producer</label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="user-type" id="consumer-type" value="consumer" required>
-                  <label class="form-check-label" for="consumer-type">Consumer</label>
-                </div>
-                <div class="invalid-feedback">Please select a user type.</div>
-              </div>
-              <div class="mb-3 form-check">
-                <input type="checkbox" class="form-check-input" id="terms-agree" required>
-                <label class="form-check-label" for="terms-agree">I agree to the terms and conditions</label>
-                <div class="invalid-feedback">You must agree before submitting.</div>
-              </div>
-              <div class="d-grid">
-                <button type="submit" class="btn btn-primary">Register</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
+    <p id="load">Firebase SDK Loading&hellip;</p>
 
-    <div class="container mt-5">
-      <div class="row">
-        <div class="col-lg-12 text-center">
-          <h1>Decentralized Supply Chain Management</h1>
-          <p class="lead">Track products through the supply chain with blockchain technology</p>
-        </div>
-      </div>
-      
-      <div class="row mt-5">
-        <div class="col-md-6 mb-4">
-          <div class="card">
-            <div class="card-body">
-              <h5 class="card-title">Producer Dashboard</h5>
-              <p class="card-text">Register as a producer to add products to the blockchain and track them through the supply chain.</p>
-              <a href="producer.html" class="btn btn-primary">Go to Producer Dashboard</a>
-            </div>
-          </div>
-        </div>
-        
-        <div class="col-md-6 mb-4">
-          <div class="card">
-            <div class="card-body">
-              <h5 class="card-title">Consumer Dashboard</h5>
-              <p class="card-text">View products, verify their authenticity, and track their journey through the supply chain.</p>
-              <a href="consumer.html" class="btn btn-success">Go to Consumer Dashboard</a>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="row mt-4">
-        <div class="col-lg-12">
-          <div class="card">
-            <div class="card-header">
-              Product Verification
-            </div>
-            <div class="card-body">
-              <h5 class="card-title">Verify a Product</h5>
-              <div class="input-group mb-3">
-                <input type="number" id="product-id-input" class="form-control" placeholder="Enter Product ID">
-                <button class="btn btn-primary" id="verify-product-btn">Verify</button>
-              </div>
-              <div id="verification-result"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const loadEl = document.querySelector('#load');
+        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+        // // The Firebase SDK is initialized and available here!
+        //
+        // firebase.auth().onAuthStateChanged(user => { });
+        // firebase.database().ref('/path/to/ref').on('value', snapshot => { });
+        // firebase.firestore().doc('/foo/bar').get().then(() => { });
+        // firebase.functions().httpsCallable('yourFunction')().then(() => { });
+        // firebase.messaging().requestPermission().then(() => { });
+        // firebase.storage().ref('/path/to/ref').getDownloadURL().then(() => { });
+        // firebase.analytics(); // call to activate
+        // firebase.analytics().logEvent('tutorial_completed');
+        // firebase.performance(); // call to activate
+        //
+        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
 
-    <footer class="bg-dark text-white mt-5 py-3">
-      <div class="container text-center">
-        <p>© 2025 Supply Chain DApp - Powered by Hedera Hashgraph</p>
-      </div>
-    </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
+        try {
+          let app = firebase.app();
+          let features = [
+            'auth', 
+            'database', 
+            'firestore',
+            'functions',
+            'messaging', 
+            'storage', 
+            'analytics', 
+            'remoteConfig',
+            'performance',
+          ].filter(feature => typeof app[feature] === 'function');
+          loadEl.textContent = `Firebase SDK loaded with ${features.join(', ')}`;
+        } catch (e) {
+          console.error(e);
+          loadEl.textContent = 'Error loading the Firebase SDK, check the console.';
+        }
+      });
+    </script>
   </body>
 </html>
